@@ -24,7 +24,7 @@
       this.unique = this._genKey();
     }
 
-    Instafeed.prototype.run = function() {
+    Instafeed.prototype.run = function(url) {
       var header, instanceName, script;
       if (typeof this.options.clientId !== 'string') {
         if (typeof this.options.accessToken !== 'string') {
@@ -42,7 +42,7 @@
       if (typeof document !== "undefined" && document !== null) {
         script = document.createElement('script');
         script.id = 'instafeed-fetcher';
-        script.src = this._buildUrl();
+        script.src = url || this._buildUrl();
         header = document.getElementsByTagName('head');
         header[0].appendChild(script);
         instanceName = "instafeedCache" + this.unique;
@@ -52,8 +52,17 @@
       return true;
     };
 
+    Instafeed.prototype.loadMore = function() {
+      var instanceName;
+      instanceName = "instafeedCache" + this.unique;
+      if (!window[instanceName].nextPage) {
+        throw new Error("Invalid next page URL.");
+      }
+      return this.run(window[instanceName].nextPage);
+    };
+
     Instafeed.prototype.parse = function(response) {
-      var anchor, fragment, header, htmlString, image, imageString, images, img, instanceName, reverse, sortSettings, _i, _j, _len, _len1;
+      var anchor, fragment, header, htmlString, image, imageString, images, img, instanceName, nextPage, reverse, sortSettings, _i, _j, _len, _len1;
       if (typeof response !== 'object') {
         if ((this.options.error != null) && typeof this.options.error === 'function') {
           this.options.error.call(this, 'Invalid JSON data');
@@ -108,7 +117,6 @@
         }
       }
       if ((typeof document !== "undefined" && document !== null) && this.options.mock === false) {
-        document.getElementById(this.options.target).innerHTML = '';
         images = response.data;
         if (images.length > this.options.limit) {
           images = images.slice(0, this.options.limit + 1 || 9e9);
@@ -130,7 +138,7 @@
             });
             htmlString += imageString;
           }
-          document.getElementById(this.options.target).innerHTML = htmlString;
+          document.getElementById(this.options.target).innerHTML += htmlString;
         } else {
           fragment = document.createDocumentFragment();
           for (_j = 0, _len1 = images.length; _j < _len1; _j++) {
@@ -151,11 +159,16 @@
         header = document.getElementsByTagName('head')[0];
         header.removeChild(document.getElementById('instafeed-fetcher'));
         instanceName = "instafeedCache" + this.unique;
-        window[instanceName] = void 0;
-        try {
-          delete window[instanceName];
-        } catch (e) {
+        nextPage = response.pagination && response.pagination.next_url;
+        if (!nextPage) {
+          window[instanceName] = void 0;
+          try {
+            delete window[instanceName];
+          } catch (e) {
 
+          }
+        } else {
+          window[instanceName].nextPage = nextPage;
         }
       }
       if ((this.options.after != null) && typeof this.options.after === 'function') {

@@ -18,7 +18,7 @@ class Instafeed
     @unique = @_genKey()
 
   # MAKE IT GO!
-  run: ->
+  run: (url) ->
     # make sure either a client id or access token is set
     if typeof @options.clientId isnt 'string'
       unless typeof @options.accessToken is 'string'
@@ -41,7 +41,7 @@ class Instafeed
       script.id = 'instafeed-fetcher'
 
       # assign the script src using _buildUrl()
-      script.src = @_buildUrl()
+      script.src = url or @_buildUrl()
 
       # add the new script object to the header
       header = document.getElementsByTagName 'head'
@@ -54,6 +54,12 @@ class Instafeed
 
     # return true if everything ran
     true
+
+  loadMore: ->
+    instanceName = "instafeedCache#{@unique}"
+    if not window[instanceName].nextPage
+      throw new Error "Invalid next page URL."
+    @run(window[instanceName].nextPage)
 
   # Data parser (must be a json object)
   parse: (response) ->
@@ -120,8 +126,6 @@ class Instafeed
     # to make it easier to test various parts of the class,
     # any DOM manipulation first checks for the DOM to exist
     if document? and @options.mock is false
-      # clear the current dom node
-      document.getElementById(@options.target).innerHTML = ''
 
       # limit the number of images if needed
       images = response.data
@@ -150,7 +154,7 @@ class Instafeed
           htmlString += imageString
 
         # add the final html to the target DOM node
-        document.getElementById(@options.target).innerHTML = htmlString
+        document.getElementById(@options.target).innerHTML += htmlString
       else
         # create a document fragment
         fragment = document.createDocumentFragment()
@@ -183,12 +187,18 @@ class Instafeed
       header = document.getElementsByTagName('head')[0]
       header.removeChild document.getElementById 'instafeed-fetcher'
 
-      # delete the cached instance of the class
+      # store next page url
       instanceName = "instafeedCache#{@unique}"
-      window[instanceName] = undefined
-      try
-        delete window[instanceName]
-      catch e
+      nextPage = response.pagination and response.pagination.next_url
+
+      # delete the cached instance of the class
+      if not nextPage
+        window[instanceName] = undefined
+        try
+          delete window[instanceName]
+        catch e
+      else
+        window[instanceName].nextPage = nextPage
     # END if document?
 
     # run after callback function, if one is set
